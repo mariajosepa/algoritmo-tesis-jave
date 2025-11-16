@@ -1,6 +1,5 @@
 from typing import Dict, Any, List
 import random
-from copy import deepcopy
 from .taller_config import (
     TAREAS,
     PRECEDENCIAS,
@@ -27,11 +26,15 @@ def generar_instancia(
     repuestos_por_ot: Dict[int, List[int]] = {}
 
     tareas_disponibles = list(TAREAS.values())
-    precedencias = deepcopy(PRECEDENCIAS)
+    precedencias_instancia = _aplicar_precedencias_opcionales(PRECEDENCIAS)
 
     for ot in ot_list:
         cantidad = random.randint(min_tareas_por_ot, max_tareas_por_ot)
-        tareas_ot = _seleccionar_tareas_validas(cantidad, tareas_disponibles, precedencias)
+        tareas_ot = _seleccionar_tareas_validas(
+            cantidad,
+            tareas_disponibles,
+            precedencias_instancia,
+        )
         mapeo_ot[ot] = tareas_ot
         tareas_a_programar.extend((ot, tarea) for tarea in tareas_ot)
         repuestos_por_ot[ot] = [
@@ -46,7 +49,7 @@ def generar_instancia(
         "tareas_a_programar": tareas_a_programar,
         "mapeo_ot": mapeo_ot,
         "tiempos_procesamiento": tiempos,
-        "prerequisitos": PRECEDENCIAS,
+        "prerequisitos": precedencias_instancia,
         "repuestos_por_ot": repuestos_por_ot,
         "operarios": OPERARIOS,
         "operarios_aptos": OPERARIOS_APTOS,
@@ -87,7 +90,12 @@ def _seleccionar_tareas_validas(
         if _puede_agregarse(tarea, seleccionadas, precedencias):
             seleccionadas.append(tarea)
 
-    seleccionadas.sort(key=lambda tarea: (len(precedencias.get(tarea, [])), tarea))
+    seleccionadas.sort(
+        key=lambda tarea: (
+            len(precedencias.get(tarea, [])),
+            tarea,
+        )
+    )
     return seleccionadas
 
 
@@ -107,3 +115,26 @@ def _generar_duraciones_variadas(
         factor = random.uniform(1 - variabilidad, 1 + variabilidad)
         tiempos[tarea_id] = max(1, int(round(base * factor)))
     return tiempos
+
+
+def _aplicar_precedencias_opcionales(
+    precedencias: Dict[int, List[int]],
+    prob_relajar: float = 0.4,
+) -> Dict[int, List[int]]:
+    """Relaja algunas precedencias para simular ramificaciones opcionales."""
+    resultado: Dict[int, List[int]] = {}
+    for tarea, requeridas in precedencias.items():
+        if not requeridas:
+            resultado[tarea] = []
+            continue
+
+        requeridas_locales: List[int] = []
+        for req in requeridas:
+            if random.random() > prob_relajar:
+                requeridas_locales.append(req)
+
+        if not requeridas_locales:
+            requeridas_locales.append(random.choice(requeridas))
+
+        resultado[tarea] = requeridas_locales
+    return resultado
