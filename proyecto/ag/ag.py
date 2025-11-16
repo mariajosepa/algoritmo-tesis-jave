@@ -222,9 +222,13 @@ def run_generations(instancia: Dict[str, Any]) -> Dict[str, Any]:
     n_tareas = len(tareas)
     gene_space = construir_gene_space(instancia)
     ga_params = {**DEFAULT_GA_CONFIG, **instancia.get("ga_config", {})}
+
+    def fitness_wrapper(ga_instance, solution, solution_idx):
+        return fitness_func(solution, solution_idx, instancia)
+
     ga_params.update(
         {
-            "fitness_func": partial(fitness_func, instancia=instancia),
+            "fitness_func": fitness_wrapper,
             "num_genes": len(gene_space),
             "gene_space": gene_space,
         }
