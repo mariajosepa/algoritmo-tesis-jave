@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import random
 from .taller_config import (
     TAREAS,
@@ -10,13 +10,27 @@ from .taller_config import (
 )
 
 
+CATEGORIAS_TAREAS: Dict[str, List[int]] = {
+    "BLOQUE": list(range(1, 15)),
+    "BIELAS": list(range(15, 20)),
+    "CIGUENAL": list(range(20, 25)),
+    "CULATA": list(range(25, 36)),
+}
+
+TAREA_A_CATEGORIA: Dict[int, str] = {}
+for categoria, ids in CATEGORIAS_TAREAS.items():
+    for tarea_id in ids:
+        TAREA_A_CATEGORIA[tarea_id] = categoria
+
+
 def generar_instancia(
     instancia_id: str,
     num_ot: int,
     min_tareas_por_ot: int = 3,
     max_tareas_por_ot: int = 7,
     variabilidad_duracion: float = 0.10,
-    prob_falta_repuesto: float = 0.15
+    prob_falta_repuesto: float = 0.15,
+    pesos_categorias: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     """Genera una sola instancia válida para los algoritmos AG y SPT."""
 
@@ -34,6 +48,7 @@ def generar_instancia(
             cantidad,
             tareas_disponibles,
             precedencias_instancia,
+            pesos_categorias,
         )
         mapeo_ot[ot] = tareas_ot
         tareas_a_programar.extend((ot, tarea) for tarea in tareas_ot)
@@ -61,7 +76,8 @@ def generar_batch_instancias(
     n: int,
     min_ot: int = 4,
     max_ot: int = 12,
-    seed: int | None = None
+    seed: int | None = None,
+    pesos_categorias: Optional[Dict[str, float]] = None,
 ) -> List[Dict[str, Any]]:
     """Genera un conjunto de instancias aleatorias."""
     if seed is not None:
@@ -70,7 +86,13 @@ def generar_batch_instancias(
     batch = []
     for i in range(n):
         num_ot = random.randint(min_ot, max_ot)
-        batch.append(generar_instancia(f"inst_{i}", num_ot))
+        batch.append(
+            generar_instancia(
+                f"inst_{i}",
+                num_ot,
+                pesos_categorias=pesos_categorias,
+            )
+        )
     return batch
 
 
@@ -78,15 +100,18 @@ def _seleccionar_tareas_validas(
     cantidad: int,
     universo: List[int],
     precedencias: Dict[int, List[int]],
+    pesos_categorias: Optional[Dict[str, float]] = None,
 ) -> List[int]:
     """Selecciona un subconjunto de tareas que respeta todas las precedencias."""
     seleccionadas: List[int] = []
     candidatos = universo.copy()
     random.shuffle(candidatos)
 
-    for tarea in candidatos:
-        if len(seleccionadas) >= cantidad:
-            break
+    while candidatos and len(seleccionadas) < cantidad:
+        categoria = _seleccionar_categoria(candidatos, pesos_categorias)
+        tarea = _seleccionar_candidato(candidatos, categoria)
+        candidatos.remove(tarea)
+
         if _puede_agregarse(tarea, seleccionadas, precedencias):
             seleccionadas.append(tarea)
 
@@ -138,3 +163,45 @@ def _aplicar_precedencias_opcionales(
 
         resultado[tarea] = requeridas_locales
     return resultado
+
+
+def _seleccionar_categoria(
+    candidatos: List[int],
+    pesos_categorias: Optional[Dict[str, float]],
+) -> str:
+    """Elige una categoría disponible en base a los pesos configurados."""
+    categorias_disponibles = {
+        TAREA_A_CATEGORIA.get(tarea) for tarea in candidatos if TAREA_A_CATEGORIA.get(tarea)
+    }
+    if not categorias_disponibles:
+        return random.choice(list(CATEGORIAS_TAREAS.keys()))
+
+    if not pesos_categorias:
+        return random.choice(list(categorias_disponibles))
+
+    ponderadas: List[tuple[str, float]] = []
+    total = 0.0
+    for categoria in categorias_disponibles:
+        peso = max(pesos_categorias.get(categoria, 0.0), 0.0)
+        ponderadas.append((categoria, peso))
+        total += peso
+
+    if total <= 0:
+        return random.choice(list(categorias_disponibles))
+
+    umbral = random.uniform(0, total)
+    acumulado = 0.0
+    for categoria, peso in ponderadas:
+        acumulado += peso
+        if umbral <= acumulado:
+            return categoria
+
+    return ponderadas[-1][0]
+
+
+def _seleccionar_candidato(candidatos: List[int], categoria: str) -> int:
+    """Selecciona una tarea aleatoria que pertenezca a la categoría solicitada."""
+    filtrados = [tarea for tarea in candidatos if TAREA_A_CATEGORIA.get(tarea) == categoria]
+    if not filtrados:
+        return random.choice(candidatos)
+    return random.choice(filtrados)

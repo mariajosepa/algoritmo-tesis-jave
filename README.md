@@ -46,11 +46,14 @@ El entry point es `proyecto/simulador.py`, que acepta:
 - `--seed`: semilla aleatoria opcional.
 - `--output`: ruta del CSV consolidado (default `resultados.csv`).
 - `--min_ot` / `--max_ot`: rango de órdenes de trabajo por instancia (default 4–12).
+- `--peso_categoria`: pondera la probabilidad de elegir tareas por área (`BLOQUE`, `BIELAS`, `CIGUENAL`, `CULATA`). Se puede repetir para asignar varios pesos (ej. `--peso_categoria CULATA=0.6 --peso_categoria BLOQUE=0.3`).
 
 Ejemplo:
 
 ```bash
-python proyecto/simulador.py --n 20 --seed 42 --output resultados.csv
+python proyecto/simulador.py --n 20 --seed 42 --output resultados.csv \
+  --peso_categoria CULATA=0.6 --peso_categoria CIGUENAL=0.1 \
+  --peso_categoria BIELAS=0.1 --peso_categoria BLOQUE=0.2
 ```
 
 El script:
