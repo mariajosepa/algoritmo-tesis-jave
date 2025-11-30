@@ -66,8 +66,8 @@ def fitness_func(
         - 15 * penalizaciones["operario_no_apto"]
         - 12 * penalizaciones["ot_ocupada"]
         - 0.1 * penalizaciones["exceso_tiempo"]
-        - 0.5 * simulacion["desbalance"]
-        - 0.1 * simulacion["makespan"]
+        - 15 * simulacion["desbalance"]
+        - 10 * simulacion["makespan"]
     )
     return float(fitness)
 
@@ -241,7 +241,12 @@ def simular_individuo(
     )
     tiempos_finales = list(tiempo_por_operario.values())
     makespan = max(tiempos_finales) if tiempos_finales else 0
-    desbalance = float(np.std(tiempos_finales)) if tiempos_finales else 0.0
+    carga_por_operario: Dict[int, int] = defaultdict(int)
+    for registro in cronograma:
+        duracion = max(0, int(registro["fin"]) - int(registro["inicio"]))
+        carga_por_operario[int(registro["operario"])] += duracion
+    cargas = list(carga_por_operario.values())
+    desbalance = float(np.std(cargas)) if cargas else 0.0
 
     return {
         "cronograma": cronograma,
