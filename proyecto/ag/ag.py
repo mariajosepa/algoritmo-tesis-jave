@@ -18,7 +18,7 @@ DEFAULT_GA_CONFIG: Dict[str, Any] = {
     "keep_parents": 5,
     "crossover_type": "single_point",
     "mutation_type": "random",
-    "mutation_percent_genes": 15,
+    "mutation_percent_genes": 25,
     "random_seed": 42,
 }
 

@@ -26,12 +26,14 @@ def formatear_resultados_spt(
 
     tareas = instancia.get("tareas_a_programar", [])
     ots = instancia.get("ots") or sorted({ot for ot, _ in tareas})
+    cronograma = simulacion.get("cronograma", [])
     tiempos_operario = simulacion.get("tiempo_por_operario", {})
-    tiempos = list(tiempos_operario.values())
+    carga_por_operario = _calcular_carga_por_operario(cronograma)
+    tiempos = list(carga_por_operario.values())
     carga_total = sum(tiempos)
     carga_std = pstdev(tiempos) if len(tiempos) > 1 else 0.0
 
-    asignaciones = _generar_asignaciones(simulacion.get("cronograma", []))
+    asignaciones = _generar_asignaciones(cronograma)
 
     resultado = {
         "algoritmo": "SPT",
@@ -43,6 +45,7 @@ def formatear_resultados_spt(
         "makespan": simulacion.get("makespan", 0),
         "carga_total": carga_total,
         "carga_std": carga_std,
+        "carga_por_operario": carga_por_operario,
         "tiempo_por_operario": dict(tiempos_operario),
         "intervalos_por_ot": {
             ot: sorted(intervalos)
@@ -81,6 +84,18 @@ def _generar_asignaciones(cronograma: Iterable[Dict[str, Any]]) -> List[Dict[str
             )
 
     return asignaciones
+
+
+def _calcular_carga_por_operario(
+    cronograma: Iterable[Dict[str, Any]]
+) -> Dict[Any, int]:
+    """Acumula el tiempo real trabajado por cada operario."""
+    carga: Dict[Any, int] = {}
+    for registro in cronograma:
+        operario = registro["operario"]
+        duracion = int(registro["fin"]) - int(registro["inicio"])
+        carga[operario] = carga.get(operario, 0) + max(0, duracion)
+    return carga
 
 
 def exportar_csv_spt(resultado: Dict[str, Any], ruta: str) -> None:
